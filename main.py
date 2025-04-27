@@ -622,18 +622,42 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                         except OSError as e:
                             logging.error(f"Error deleting {file}: {e}")
             else:
-                raise Exception("No batches found for the given search name.")
-                
-        except Exception as e:
-            logging.exception(f"An unexpected error occurred: {e}")
-            try:
-                await editable.edit(f"**Error : {e}**")
-            except Exception as ee:
-                logging.error(f"Failed to send error message to user in callback: {ee}")
-        finally:
-            if session:
-                await session.close()
-            await CONNECTOR.close()
+                # If no batches were found, ask the user to provide the batch info
+                await editable.edit("**No batches found for the given search name. Please provide Batch Name - Batch_id:**")
+
+                try:
+                    input5 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                    batch_info = input5.text
+                    await input5.delete(True)
+                except:
+                    await editable.edit("**Timeout! You took too long to respond**")
+                    return
+
+                if '-' in batch_info:
+        # Split the input into batch_name and batch_id
+                    batch_name, batch_id = batch_info.split('-')
+                    selected_batch_id = batch_id.strip()
+                    selected_batch_name = batch_name.strip()
+                    clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
+                    clean_file_name = f"{user_id}_{clean_batch_name}"
+        
+        # Continue with the batch information
+                    await editable.edit(f"**Batch Selected: {selected_batch_name} - {selected_batch_id}**")
+                else:
+                    await editable.edit("**Invalid format. Please provide Batch Name - Batch_id.**")
+                    return
+
+            except Exception as e:
+                logging.exception(f"An unexpected error occurred: {e}")
+                try:
+                    await editable.edit(f"**Error: {e}**")
+                except Exception as ee:
+                    logging.error(f"Failed to send error message to user in callback: {ee}")
+            finally:
+                if session:
+                    await session.close()
+                await CONNECTOR.close()
+
 
 
 # Cp Function 
