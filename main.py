@@ -425,51 +425,61 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                 }
 
                 try:
+    # Attempt login and retrieve access token
                     async with session.post(f"https://api.penpencil.co/v3/oauth/token", json=payload, headers=headers) as response:
-                        access_token = (await response.json())["data"]["access_token"]
-                        monster = await editable.edit(f"<b>Physics Wallah Login Successful ✅</b>\n\n<pre language='Save this Login Token for future usage'>{access_token}</pre>\n\n")
-                        editable = await m.reply_text("**Getting Batches In Your I'd**")
-                    
+                        response_data = await response.json()
+                        if response.status == 200 and "data" in response_data:
+                            access_token = response_data["data"]["access_token"]
+                            monster = await editable.edit(f"<b>Physics Wallah Login Successful ✅</b>\n\n<pre language='Save this Login Token for future usage'>{access_token}</pre>\n\n")
+                            editable = await m.reply_text("**Getting Batches In Your ID**")
+                        else:
+                            raise Exception("Login failed. Invalid token or credentials.")
                 except Exception as e:
-                    await editable.edit(f"**Error : {e}**")
+                    await editable.edit(f"**Error: {e}**")
                     return
 
-            else:
-                access_token = raw_text1
-            
-            headers['authorization'] = f"Bearer {access_token}"
-        
-            params = {
-                'mode': '1',
-                'page': '1',
-            }
-            try:
-                async with session.get(f"https://api.penpencil.co/v3/batches/all-purchased-batches", headers=headers, params=params) as response:
-                    response.raise_for_status()
-                    batches = (await response.json()).get("data", [])
-            except Exception as e:
-                await editable.edit("**```\nLogin Failed❗TOKEN IS EXPIRED```\nPlease Enter Working Token\n                       OR\nLogin With Phone Number**")
-                return
-        
-            await editable.edit("**Enter Your Batch Name**")
-            try:
-                input3 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
-                batch_search = input3.text
-                await input3.delete(True)
-            except:
-                await editable.edit("**Timeout! You took too long to respond**")
-                return
-                
-            url = f"https://api.penpencil.co/v3/batches/search?name={batch_search}"
-            courses = await fetch_pwwp_data(session, url, headers)
-            courses = courses.get("data", {}) if courses else {}
+# Set authorization header with the access token
+                headers['authorization'] = f"Bearer {access_token}"
 
-            if courses:
-                text = ''
-                for cnt, course in enumerate(courses):
-                    name = course['name']
-                    text += f"{cnt + 1}. ```\n{name}```\n"
-                await editable.edit(f"**Send index number of the course to download.\n\n{text}\n\nIf Your Batch Not Listed Above Enter - No**")
+# Fetch batches
+                params = {
+                    'mode': '1',
+                    'page': '1',
+                }
+                try:
+                    async with session.get(f"https://api.penpencil.co/v3/batches/all-purchased-batches", headers=headers, params=params) as response:
+                        response.raise_for_status()
+                        batches_data = await response.json()
+                        if "data" in batches_data:
+                            batches = batches_data["data"]
+                        else:
+                            raise Exception("No batches found or invalid response data.")
+                except Exception as e:
+                    await editable.edit("**Login Failed❗TOKEN IS EXPIRED**\nPlease Enter a Working Token\nOR\nLogin With Phone Number")
+                    return
+
+# Proceed to fetch batch details
+                await editable.edit("**Enter Your Batch Name**")
+                try:
+                    input3 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                    batch_search = input3.text
+                    await input3.delete(True)
+                except:
+                    await editable.edit("**Timeout! You took too long to respond**")
+                    return
+
+                url = f"https://api.penpencil.co/v3/batches/search?name={batch_search}"
+                courses = await fetch_pwwp_data(session, url, headers)
+                courses = courses.get("data", {}) if courses else {}
+
+# Continue to list available courses and prompt for selection
+                if courses:
+                    text = ''
+                    for cnt, course in enumerate(courses):
+                        name = course['name']
+                        text += f"{cnt + 1}. ```\n{name}```\n"
+                    await editable.edit(f"**Send index number of the course to download.\n\n{text}\n\nIf Your Batch Not Listed Above Enter - No**")
+
 
                 try:
                     input4 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
