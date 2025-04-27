@@ -470,7 +470,7 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                     name = course['name']
                     text += f"{cnt + 1}. ```\n{name}```\n"
                 await editable.edit(f"**Send index number of the course to download.\n\n{text}\n\nIf Your Batch Not Listed Above Enter - No**")
-            
+
                 try:
                     input4 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
                     raw_text4 = input4.text
@@ -478,7 +478,7 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                 except:
                     await editable.edit("**Timeout! You took too long to respond**")
                     return
-                
+
                 if input4.text.isdigit() and 1 <= int(input4.text) <= len(courses):
                     selected_course_index = int(input4.text.strip())
                     course = courses[selected_course_index - 1]
@@ -486,39 +486,34 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                     selected_batch_name = course['name']
                     clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
                     clean_file_name = f"{user_id}_{clean_batch_name}"
-                    
+
                 elif "No" in input4.text:
-                    courses = find_pw_old_batch(batch_search)
-                    if courses:
-                        text = ''
-                        for cnt, course in enumerate(courses):
-                            name = course['batch_name']
-                            text += f"{cnt + 1}. ```\n{name}```\n"
-                            
-                        await editable.edit(f"**Send index number of the course to download.\n\n{text}**")
-                
-                        try:
-                            input5 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
-                            raw_text5 = input5.text
-                            await input5.delete(True)
-                        except:
-                            await editable.edit("**Timeout! You took too long to respond**")
-                            return
-                
-                        if input5.text.isdigit() and 1 <= int(input5.text) <= len(courses):
-                            selected_course_index = int(input5.text.strip())
-                            course = courses[selected_course_index - 1]
-                            selected_batch_id = course['batch_id']
-                            selected_batch_name = course['batch_name']
-                            clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
-                            clean_file_name = f"{user_id}_{clean_batch_name}"
-                        else:
-                            raise Exception("Invalid batch index.")
+        # Ask for batch_id after "No"
+                    await editable.edit("**Please enter Batch Name - batch_id:**")
+        
+                    try:
+                        input5 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                        batch_info = input5.text
+                        await input5.delete(True)
+                    except:
+                        await editable.edit("**Timeout! You took too long to respond**")
+                        return
+
+                    if '-' in batch_info:
+                        batch_name, batch_id = batch_info.split('-')
+                        selected_batch_id = batch_id.strip()
+                        selected_batch_name = batch_name.strip()
+                        clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
+                        clean_file_name = f"{user_id}_{clean_batch_name}"
+                    else:
+                        await editable.edit("**Invalid format. Please provide Batch Name - batch_id.**")
+                        return
+
                 else:
                     raise Exception("Invalid batch index.")
-                    
+    
                 await editable.edit("1.```\nFull Batch```\n2.```\nToday's Class```\n3.```\nKhazana```")
-                    
+
                 try:
                     input6 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
                     raw_text6 = input6.text
@@ -533,10 +528,11 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                     except:
                         logging.error(f"Failed to send error message to user: {e}")
                     return
-                        
+
                 await editable.edit(f"**Extracting course : {selected_batch_name} ...**")
 
                 start_time = time.time()
+
 
                 if input6.text == '1':
                 
