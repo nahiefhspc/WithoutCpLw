@@ -444,65 +444,99 @@ async def process_pwwp(bot: Client, m: Message, user_id: int):
                 'page': '1',
             }
             try:
-                    async with session.get(
-                        "https://api.penpencil.co/v3/batches/all-purchased-batches",
-                        headers=headers, params=params
-                    ) as response:
-                        response.raise_for_status()
+                async with session.get(f"https://api.penpencil.co/v3/batches/all-purchased-batches", headers=headers, params=params) as response:
+                    response.raise_for_status()
                     batches = (await response.json()).get("data", [])
+            except Exception as e:
+                await editable.edit("**```\nLogin Failed❗TOKEN IS EXPIRED```\nPlease Enter Working Token\n                       OR\nLogin With Phone Number**")
+                return
+        
+            await editable.edit("**Enter Your Batch Name**")
+            try:
+                input3 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                batch_search = input3.text
+                await input3.delete(True)
+            except:
+                await editable.edit("**Timeout! You took too long to respond**")
+                return
+                
+            url = f"https://api.penpencil.co/v3/batches/search?name={batch_search}"
+            courses = await fetch_pwwp_data(session, url, headers)
+            courses = courses.get("data", {}) if courses else {}
+
+            if courses:
+                text = ''
+                for cnt, course in enumerate(courses):
+                    name = course['name']
+                    text += f"{cnt + 1}. ```\n{name}```\n"
+                await editable.edit(f"**Send index number of the course to download.\n\n{text}\n\nIf Your Batch Not Listed Above Enter - No**")
+            
+                try:
+                    input4 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                    raw_text4 = input4.text
+                    await input4.delete(True)
+                except:
+                    await editable.edit("**Timeout! You took too long to respond**")
+                    return
+                
+                if input4.text.isdigit() and 1 <= int(input4.text) <= len(courses):
+                    selected_course_index = int(input4.text.strip())
+                    course = courses[selected_course_index - 1]
+                    selected_batch_id = course['_id']
+                    selected_batch_name = course['name']
+                    clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
+                    clean_file_name = f"{user_id}_{clean_batch_name}"
+                    
+                elif "No" in input4.text:
+                    courses = find_pw_old_batch(batch_search)
+                    if courses:
+                        text = ''
+                        for cnt, course in enumerate(courses):
+                            name = course['batch_name']
+                            text += f"{cnt + 1}. ```\n{name}```\n"
+                            
+                        await editable.edit(f"**Send index number of the course to download.\n\n{text}**")
+                
+                        try:
+                            input5 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                            raw_text5 = input5.text
+                            await input5.delete(True)
+                        except:
+                            await editable.edit("**Timeout! You took too long to respond**")
+                            return
+                
+                        if input5.text.isdigit() and 1 <= int(input5.text) <= len(courses):
+                            selected_course_index = int(input5.text.strip())
+                            course = courses[selected_course_index - 1]
+                            selected_batch_id = course['batch_id']
+                            selected_batch_name = course['batch_name']
+                            clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
+                            clean_file_name = f"{user_id}_{clean_batch_name}"
+                        else:
+                            raise Exception("Invalid batch index.")
+                else:
+                    raise Exception("Invalid batch index.")
+                    
+                await editable.edit("1.```\nFull Batch```\n2.```\nToday's Class```\n3.```\nKhazana```")
+                    
+                try:
+                    input6 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                    raw_text6 = input6.text
+                    await input6.delete(True)
+                except ListenerTimeout:
+                    await editable.edit("**Timeout! You took too long to respond**")
+                    return
                 except Exception as e:
-                    await editable.edit(
-                        "**```\nLogin Failed❗TOKEN IS EXPIRED```\nPlease Enter Working Token\n                       OR\nLogin With Phone Number**"
-                    )
+                    logging.exception("Error during option listening:")
+                    try:
+                        await editable.edit(f"**Error: {e}**")
+                    except:
+                        logging.error(f"Failed to send error message to user: {e}")
                     return
-    
-                # After working token, ask Batch Name
-                await editable.edit("**Send your Batch Name**")
-                try:
-                    input_batch_name = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
-                    batch_name = input_batch_name.text.strip()
-                    await input_batch_name.delete(True)
-                except:
-                    await editable.edit("**Timeout! You took too long to respond**")
-                    return
-
-                # Ask Batch ID
-                await editable.edit("**Send your Batch ID**")
-                try:
-                    input_batch_id = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
-                    batch_id = input_batch_id.text.strip()
-                    await input_batch_id.delete(True)
-                except:
-                    await editable.edit("**Timeout! You took too long to respond**")
-                    return
-
-    # Cleaning names
-                clean_batch_name = batch_name.replace("/", "-").replace("|", "-")
-                clean_file_name = f"{user_id}_{clean_batch_name}"
-
-    # Ask for Option (Full Batch / Today's Class / Khazana)
-                await editable.edit(
-                    "**Choose an option:**\n\n"
-                    "1.```\nFull Batch```\n"
-                    "2.```\nToday's Class```\n"
-                    "3.```\nKhazana```"
-                )
-
-                try:
-                    input_option = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
-                    selected_option = input_option.text.strip()
-                    await input_option.delete(True)
-                except:
-                    await editable.edit("**Timeout! You took too long to respond**")
-                    return
-    
-                await editable.edit(f"**Extracting course: {batch_name} ...**")
+                        
+                await editable.edit(f"**Extracting course : {selected_batch_name} ...**")
 
                 start_time = time.time()
-
-# Now continue processing according to selected batch and selected option
-# Example: batch_id, batch_name, selected_option will be available for further work
-
 
                 if input6.text == '1':
                 
