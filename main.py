@@ -867,146 +867,117 @@ async def process_cpwp(bot: Client, m: Message, user_id: int):
                 if hash_match:
                     token = hash_match.group(1)
                     
-                    async with session.get(f"https://api.classplusapp.com/v2/course/preview/similar/{token}?limit=300", headers=headers) as response:
+                    async with session.get(f"https://api.classplusapp.com/v2/course/preview/similar/{token}?limit=100", headers=headers) as response:
                         if response.status == 200:
                             res_json = await response.json()
                             courses = res_json.get('data', {}).get('coursesData', [])
 
                             if courses:
-    total = len(courses)
-    if total > 20:
-        text = ''
-        for cnt, course in enumerate(courses):
-            name = course['name']
-            price = course['finalPrice']
-            text += f'{cnt + 1}. {name} 💵₹{price}\n'
-        
-        course_details = f"course_details_{user_id}"
-        
-        with open(f"{course_details}.txt", 'w') as f:
-            f.write(text)
-            
-        try:
-            with open(f"{course_details}.txt", 'rb') as f:
-                await editable.delete(True)
-                await m.reply_document(document=f, caption="**Please check the file and send the index number of the Category Name.**", file_name="course_details.txt")
-                editable = await m.reply_text("**Send index number from the course details text file.**")
-        except Exception as e:
-            logging.error(f"Error sending document {course_details}.txt: {e}")
-            await editable.edit(f"**Error sending file: {e}**")
-            return
-        finally:
-            try:
-                os.remove(f"{course_details}.txt")
-            except OSError as e:
-                logging.error(f"Error deleting {course_details}.txt: {e}")
-    else:
-        text = ''
-        for cnt, course in enumerate(courses):
-            name = course['name']
-            price = course['finalPrice']
-            text += f'{cnt + 1}. ```\n{name} 💵₹{price}```\n'
-        await editable.edit(f"**Send index number of the Batch to download.\n\n{text}**")
+                                text = ''
+                                for cnt, course in enumerate(courses):
+                                    name = course['name']
+                                    price = course['finalPrice']
+                                    text += f'{cnt + 1}. {name} 💵₹{price}\n'
 
-    try:
-        input2 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
-        raw_text2 = input2.text
-        await input2.delete(True)
-    except ListenerTimeout:
-        await editable.edit("**Timeout! You took too long to respond**")
-        return
-    except Exception as e:
-        logging.exception("Error during input2 listening:")
-        await editable.edit(f"**Error: {e}**")
-        return
+                                if len(courses) > 20:
+                                    # Create and send .txt file
+                                    file_name = f"courses_{user_id}.txt"
+                                    with open(file_name, 'w', encoding='utf-8') as f:
+                                        f.write(text)
+                
+                                    await bot.send_document(
+                                        chat_id=m.chat.id,
+                    document=open(file_name, 'rb'),
+                                        caption="Courses list is too long. I've sent it as a text file. Please send the index number of the desired course."
+                                    )
+                                    # Clean up the file
+                                    import os
+                                    os.remove(file_name)
+                                else:
+                                    await editable.edit(f"**Send index number of the Category Name\n\n```\n{text}\n```\nIf Your Batch Not Listed Then Enter Your Batch Name**")
 
-    if input2.text.isdigit() and len(input2.text) <= len(courses):
-        selected_course_index = int(input2.text.strip())
-        course = courses[selected_course_index - 1]
-        selected_batch_id = course['id']
-        selected_batch_name = course['name']
-        price = course['finalPrice']
-        clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
-        clean_file_name = f"{user_id}_{clean_batch_name}"
-        
-        # Continue processing (e.g., download or next step)
-        await editable.edit(f"**Selected Batch: {selected_batch_name} 💵₹{price}**\nProcessing...")
-        # Add your code here for what happens next (e.g., downloading, API calls, etc.)
-        
-    else:
-        search_url = f"https://api.classplusapp.com/v2/course/preview/similar/{token}?search={raw_text2}"
-        async with session.get(search_url, headers=headers) as response:
-            if response.status == 200:
-                res_json = await response.json()
-                courses = res_json.get("data", {}).get("coursesData", [])
+                                try:
+                                    input2 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                                    raw_text2 = input2.text
+                                    await input2.delete(True)
+                                except ListenerTimeout:
+                                    await editable.edit("**Timeout! You took too long to respond**")
+                                    return
+                                except Exception as e:
+                                    logging.exception("Error during input1 listening:")
+                                    try:
+                                        await editable.edit(f"**Error : {e}**")
+                                    except:
+                                        logging.error(f"Failed to send error message to user : {e}")
+                                    return
 
-                if courses:
-                    total = len(courses)
-                    if total > 20:
-                        text = ''
-                        for cnt, course in enumerate(courses):
-                            name = course['name']
-                            price = course['finalPrice']
-                            text += f'{cnt + 1}. {name} 💵₹{price}\n'
-                        
-                        course_details = f"course_details_{user_id}"
-                        
-                        with open(f"{course_details}.txt", 'w') as f:
-                            f.write(text)
+                                if input2.text.isdigit() and int(input2.text) <= len(courses):
+                                    selected_course_index = int(input2.text.strip())
+                                    course = courses[selected_course_index - 1]
+                                    selected_batch_id = course['id']
+                                    selected_batch_name = course['name']
+                                    price = course['finalPrice']
+                                    clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
+                                    clean_file_name = f"{user_id}_{clean_batch_name}"
+                                else:
+                                    search_url = f"https://api.classplusapp.com/v2/course/preview/similar/{token}?search={raw_text2}"
+                                    async with session.get(search_url, headers=headers) as response:
+                                        if response.status == 200:
+                                            res_json = await response.json()
+                                            courses = res_json.get("data", {}).get("coursesData", [])
+
+                                            if courses:
+                                                text = ''
+                                                for cnt, course in enumerate(courses):
+                                                    name = course['name']
+                                                    price = course['finalPrice']
+                                                    text += f'{cnt + 1}. {name} 💵₹{price}\n'
                             
-                        try:
-                            with open(f"{course_details}.txt", 'rb') as f:
-                                await editable.delete(True)
-                                await m.reply_document(document=f, caption="**Please check the file and send the index number of the Category Name.**", file_name="course_details.txt")
-                                editable = await m.reply_text("**Send index number from the course details text file.**")
-                        except Exception as e:
-                            logging.error(f"Error sending document {course_details}.txt: {e}")
-                            await editable.edit(f"**Error sending file: {e}**")
-                            return
-                        finally:
-                            try:
-                                os.remove(f"{course_details}.txt")
-                            except OSError as e:
-                                logging.error(f"Error deleting {course_details}.txt: {e}")
-                    else:
-                        text = ''
-                        for cnt, course in enumerate(courses):
-                            name = course['name']
-                            price = course['finalPrice']
-                            text += f'{cnt + 1}. ```\n{name} 💵₹{price}```\n'
-                        await editable.edit(f"**Send index number of the Batch to download.\n\n{text}**")
+                                                if len(courses) > 20:
+                                                    # Create and send .txt file for search results
+                                                    file_name = f"search_courses_{user_id}.txt"
+                                                    with open(file_name, 'w', encoding='utf-8') as f:
+                                                        f.write(text)
+                                
+                                                    await bot.send_document(
+                                                        chat_id=m.chat.id,
+                                                        document=open(file_name, 'rb'),
+                                                        caption="Search results are too long. I've sent them as a text file. Please send the index number of the desired course."
+                                                    )
+                                                    import os
+                                                    os.remove(file_name)
+                                                else:
+                                                    await editable.edit(f"**Send index number of the Batch to download.\n\n```\n{text}\n```**")
 
-                    try:
-                        input3 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
-                        raw_text3 = input3.text
-                        await input3.delete(True)
-                    except ListenerTimeout:
-                        await editable.edit("**Timeout! You took too long to respond**")
-                        return
-                    except Exception as e:
-                        logging.exception("Error during input3 listening:")
-                        await editable.edit(f"**Error: {e}**")
-                        return
+                                                try:
+                                                    input3 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
+                                                    raw_text3 = input3.text
+                                                    await input3.delete(True)
+                                                except ListenerTimeout:
+                                                    await editable.edit("**Timeout! You took too long to respond**")
+                                                    return
+                                                except Exception as e:
+                                                    logging.exception("Error during input3 listening:")
+                                                    try:
+                                                        await editable.edit(f"**Error : {e}**")
+                                                    except:
+                                                        logging.error(f"Failed to send error message to user : {e}")
+                                                    return
 
-                    if input3.text.isdigit() and len(input3.text) <= len(courses):
-                        selected_course_index = int(input3.text.strip())
-                        course = courses[selected_course_index - 1]
-                        selected_batch_id = course['id']
-                        selected_batch_name = course['name']
-                        price = course['finalPrice']
-                        clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
-                        clean_file_name = f"{user_id}_{clean_batch_name}"
-                        
-                        # Continue processing (e.g., download or next step)
-                        await editable.edit(f"**Selected Batch: {selected_batch_name} 💵₹{price}**\nProcessing...")
-                        # Add your code here for what happens next (e.g., downloading, API calls, etc.)
-                    
-                    else:
-                        raise Exception("Wrong Index Number")
-                else:
-                    raise Exception("Didn't Find Any Course Matching The Search Term")
-            else:
-                raise Exception(f"API Error: {response.text}")
+                                                if input3.text.isdigit() and int(input3.text) <= len(courses):
+                                                    selected_course_index = int(input3.text.strip())
+                                                    course = courses[selected_course_index - 1]
+                                                    selected_batch_id = course['id']
+                                                    selected_batch_name = course['name']
+                                                    price = course['finalPrice']
+                                                    clean_batch_name = selected_batch_name.replace("/", "-").replace("|", "-")
+                                                    clean_file_name = f"{user_id}_{clean_batch_name}"
+                                                else:
+                                                    raise Exception("Wrong Index Number")
+                                            else:
+                                                raise Exception("Didn't Find Any Course Matching The Search Term")
+                                        else:
+                                            raise Exception(f"{response.text}")
                                             
                                 download_price = int(price * 0.10)
                                 batch_headers = {
