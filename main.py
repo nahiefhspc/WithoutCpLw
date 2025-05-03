@@ -873,14 +873,38 @@ async def process_cpwp(bot: Client, m: Message, user_id: int):
                             courses = res_json.get('data', {}).get('coursesData', [])
 
                             if courses:
-                                text = ''
-                                for cnt, course in enumerate(courses):
-                                    name = course['name']
-                                    price = course['finalPrice']
-                                    text += f'{cnt + 1}. ```\n{name} 💵₹{price}```\n'
-
-                                await editable.edit(f"**Send index number of the Category Name\n\n{text}\nIf Your Batch Not Listed Then Enter Your Batch Name**")
-                            
+                                total = len(courses)
+                                if total > 20:
+                                    text = ''
+                                    for cnt, course in enumerate(courses):
+                                        name = course['name']
+                                        price = course['finalPrice']
+                                        text += f'{cnt + 1}. {name} 💵₹{price}\n'
+        
+                                    course_details = f"course_details_{id(editable)}"
+        
+                                    with open(f"{course_details}.txt", 'w') as f:
+                                        f.write(text)
+            
+                                    try:
+                                        with open(f"{course_details}.txt", 'rb') as f:
+                                            await editable.delete(True)
+                                            await m.reply_document(document=f, caption="**Please check the file and send the index number of the Category Name.**", file_name="course_details.txt")
+                                            await m.reply_text("**Send index number from the course details text file.**")
+                                    except Exception as e:
+                                        logging.error(f"Error sending document {course_details}.txt: {e}")
+                                    finally:
+                                        try:
+                                            os.remove(f"{course_details}.txt")
+                                        except OSError as e:
+                                            logging.error(f"Error deleting {course_details}.txt: {e}")
+                                else:
+                                    text = ''
+                                    for cnt, course in enumerate(courses):
+                                        name = course['name']
+                                        price = course['finalPrice']
+                                        text += f'{cnt + 1}. ```\n{name} 💵₹{price}```\n'
+                                    await editable.edit(f"**Send index number of the Category Name\n\n{text}\nIf Your Batch Not Listed Then Enter Your Batch Name**")                            
                                 try:
                                     input2 = await bot.listen(chat_id=m.chat.id, filters=filters.user(user_id), timeout=120)
                                     raw_text2 = input2.text
